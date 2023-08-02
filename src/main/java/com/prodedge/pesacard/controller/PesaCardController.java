@@ -7,17 +7,25 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.prodedge.pesacard.model.PesaCard;
+import com.prodedge.pesacard.repository.PesaCardRepository;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/pesacards")
 public class PesaCardController {
+    private PesaCardRepository pesaCardRepository;
+
+    public PesaCardController(PesaCardRepository pesaCardRepository) {
+        this.pesaCardRepository = pesaCardRepository;
+    }
 
     @GetMapping("/{requestedId}")
     public ResponseEntity<PesaCard> findById(@PathVariable Long requestedId) {
 
-        if (requestedId.equals(99L)) {
-            PesaCard pesaCard = new PesaCard(99L, 123.45);
-            return ResponseEntity.ok(pesaCard);
+        Optional<PesaCard> pesaCardOptional = pesaCardRepository.findById(requestedId);
+
+        if (pesaCardOptional.isPresent()) {
+            return ResponseEntity.ok(pesaCardOptional.get());
         } else {
             return ResponseEntity.notFound().build();
         }
