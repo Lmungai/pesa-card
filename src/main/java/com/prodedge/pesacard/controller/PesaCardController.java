@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,7 +18,7 @@ import com.prodedge.pesacard.repository.PesaCardRepository;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Optional;
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/pesacards")
@@ -28,46 +29,52 @@ public class PesaCardController {
         this.pesaCardRepository = pesaCardRepository;
     }
 
+    private PesaCard findPesaCard(Long requestedId, Principal principal) {
+        return pesaCardRepository.findByIdAndOwner(requestedId, principal.getName());
+    }
+
     @GetMapping("/{requestedId}")
-    public ResponseEntity<PesaCard> findById(@PathVariable Long requestedId) {
-
-        Optional<PesaCard> pesaCardOptional = pesaCardRepository.findById(requestedId);
-
-        if (pesaCardOptional.isPresent()) {
-            return ResponseEntity.ok(pesaCardOptional.get());
+    public ResponseEntity<PesaCard> findById(@PathVariable Long requestedId, Principal principal) {
+        PesaCard pesaCard = findPesaCard(requestedId, principal);
+        if (pesaCard != null) {
+            return ResponseEntity.ok(pesaCard);
         } else {
             return ResponseEntity.notFound().build();
         }
-
     }
 
     @PostMapping
-    private ResponseEntity<Void> createCashCard(@RequestBody PesaCard newCashCardRequest, UriComponentsBuilder ucb) {
-        PesaCard savedCashCard = pesaCardRepository.save(newCashCardRequest);
-        URI locationOfNewCashCard = ucb
+    private ResponseEntity<Void> createPesaCard(@RequestBody PesaCard newCashCardRequest, UriComponentsBuilder ucb,
+            Principal principal) {
+
+        PesaCard pesaCardWithOwner = new PesaCard(null, newCashCardRequest.amount(), principal.getName());
+        PesaCard savedPesaCard = pesaCardRepository.save(pesaCardWithOwner);
+        URI locationofNewPesaCard = ucb
                 .path("pesacards/{id}")
-                .buildAndExpand(savedCashCard.id())
+                .buildAndExpand(savedPesaCard.id())
                 .toUri();
-        return ResponseEntity.created(locationOfNewCashCard).build();
+        return ResponseEntity.created(locationofNewPesaCard).build();
     }
 
-    // @PostMapping
-    // private ResponseEntity<Void> createPesaCard(@RequestBody PesaCard
-    // newPesaCardRequest, UriComponentsBuilder ucb) {
-    // PesaCard savedPesaCard = pesaCardRepository.save(newPesaCardRequest);
-    // URI locationOfNewPesaCard = ucb
-    // .path("pesacards/{id}")
-    // .buildAndExpand(savedPesaCard.id())
-    // .toUri();
-    // return ResponseEntity.created(locationOfNewPesaCard).build();
-    // }
-
     @GetMapping
-    public ResponseEntity<List<PesaCard>> findAll(Pageable pageable) {
-        Page<PesaCard> page = pesaCardRepository.findAll(
+    public ResponseEntity<List<PesaCard>> findAll(Pageable pageable, Principal principal) {
+        Page<PesaCard> page = pesaCardRepository.findByOwner(principal.getName(),
                 PageRequest.of(
                         pageable.getPageNumber(),
                         pageable.getPageSize(), pageable.getSort()));
+
         return ResponseEntity.ok(page.getContent());
+    }
+
+    @PutMapping("/{requestedId}")
+    private ResponseEntity<Void> putCashCard(@PathVariable Long requestedId, @RequestBody PesaCard pesaCardUpdate,
+            Principal principal) {
+        PesaCard pesaCard = findPesaCard(requestedId, principal);
+        if (pesaCard != null) {
+            PesaCard updatedPesaCard = new PesaCard(pesaCard.id(), pesaCardUpdate.amount(), principal.getName());
+            pesaCardRepository.save(updatedPesaCard);
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
     }
 }

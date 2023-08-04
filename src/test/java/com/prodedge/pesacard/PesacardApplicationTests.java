@@ -11,10 +11,11 @@ import net.minidev.json.JSONArray;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.annotation.DirtiesContext.ClassMode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,7 +30,10 @@ class PesacardApplicationTests {
 
 	@Test
 	void shouldReturnAPesaCardWhenDataIsSaved() {
-		ResponseEntity<String> response = restTemplate.getForEntity("/pesacards/99", String.class);
+
+		ResponseEntity<String> response = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.getForEntity("/pesacards/99", String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -42,7 +46,9 @@ class PesacardApplicationTests {
 
 	@Test
 	void shouldNotReturnAPesaCardWithAnUnknownId() {
-		ResponseEntity<String> response = restTemplate.getForEntity("/pesacards/1000", String.class);
+		ResponseEntity<String> response = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.getForEntity("/pesacards/1000", String.class);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 		assertThat(response.getBody()).isBlank();
@@ -51,12 +57,16 @@ class PesacardApplicationTests {
 	@Test
 	@DirtiesContext
 	void shouldCreateANewCashCard() {
-		PesaCard newCashCard = new PesaCard(null, 250.0);
-		ResponseEntity<Void> createResponse = restTemplate.postForEntity("/pesacards", newCashCard, Void.class);
+		PesaCard newCashCard = new PesaCard(null, 250.0, "juma");
+		ResponseEntity<Void> createResponse = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.postForEntity("/pesacards", newCashCard, Void.class);
 		assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
 		URI locationOfNewCashCard = createResponse.getHeaders().getLocation();
-		ResponseEntity<String> getResponse = restTemplate.getForEntity(locationOfNewCashCard, String.class);
+		ResponseEntity<String> getResponse = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.getForEntity(locationOfNewCashCard, String.class);
 		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(getResponse.getBody());
@@ -69,8 +79,9 @@ class PesacardApplicationTests {
 
 	@Test
 	void shouldReturnAllCashCardsWhenListIsRequested() {
-		ResponseEntity<String> response = restTemplate.getForEntity("/pesacards",
-				String.class);
+		ResponseEntity<String> response = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.getForEntity("/pesacards", String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -86,8 +97,9 @@ class PesacardApplicationTests {
 
 	@Test
 	void shouldReturnASortedPageOfCashCards() {
-		ResponseEntity<String> response = restTemplate.getForEntity("/pesacards?page=0&size=1&sort=amount,desc",
-				String.class);
+		ResponseEntity<String> response = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.getForEntity("/pesacards?page=0&size=1&sort=amount,desc", String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -96,5 +108,80 @@ class PesacardApplicationTests {
 
 		double amount = documentContext.read("$[0].amount");
 		assertThat(amount).isEqualTo(150.0);
+	}
+
+	@Test
+	void shouldReturnASortedPageOfCashCardsWithNoParametersAndUseDefaultValues() {
+		ResponseEntity<String> response = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.getForEntity("/pesacards", String.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+		DocumentContext documentContext = JsonPath.parse(response.getBody());
+		JSONArray page = documentContext.read("$[*]");
+		assertThat(page.size()).isEqualTo(3);
+
+		JSONArray amounts = documentContext.read("$..amount");
+		assertThat(amounts).containsExactly(123.45, 1.00, 150.00);
+	}
+
+	@Test
+	void shouldNotReturnACashCardWhenUsingBadCredentials() {
+		ResponseEntity<String> response = restTemplate
+				.withBasicAuth("BAD-USER", "abc123")
+				.getForEntity("/cashcards/99", String.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+		response = restTemplate
+				.withBasicAuth("sarah1", "BAD-PASSWORD")
+				.getForEntity("/cashcards/99", String.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+	}
+
+	@Test
+	void shouldRejectUsersWhoAreNotCardOwners() {
+		ResponseEntity<String> response = restTemplate
+				.withBasicAuth("bakari-owns-no-cards", "qrs456")
+				.getForEntity("/pesacards/99", String.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+	}
+
+	@Test
+	void shouldNotAllowAccessToCashCardsTheyDoNotOwn() {
+		ResponseEntity<String> response = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.getForEntity("/pesacards/102", String.class); // kumar2's data
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	@DirtiesContext
+	void shouldUpdateAnExistingCashCard() {
+		PesaCard pesaCardUpdate = new PesaCard(null, 19.99, null);
+		HttpEntity<PesaCard> request = new HttpEntity<>(pesaCardUpdate);
+		ResponseEntity<Void> response = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.exchange("/pesacards/99", HttpMethod.PUT, request, Void.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+		ResponseEntity<String> getResponse = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.getForEntity("/pesacards/99", String.class);
+		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+		DocumentContext documentContext = JsonPath.parse(getResponse.getBody());
+		Number id = documentContext.read("$.id");
+		Double amount = documentContext.read("$.amount");
+		assertThat(id).isEqualTo(99);
+		assertThat(amount).isEqualTo(19.99);
+	}
+
+	@Test
+	void shouldNotUpdateACashCardThatDoesNotExist() {
+		PesaCard unknownCard = new PesaCard(null, 19.99, null);
+		HttpEntity<PesaCard> request = new HttpEntity<>(unknownCard);
+		ResponseEntity<Void> response = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.exchange("/pesacards/99999", HttpMethod.PUT, request, Void.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 }

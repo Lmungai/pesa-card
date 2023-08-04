@@ -24,20 +24,10 @@ public class PesaCardJsonTest {
     @BeforeEach
     void setUp() {
         pesaCards = Arrays.array(
-                new PesaCard(99L, 123.45),
-                new PesaCard(100L, 1.0),
-                new PesaCard(101L, 150.0));
+                new PesaCard(99L, 123.45, "juma"),
+                new PesaCard(100L, 1.0, "juma"),
+                new PesaCard(101L, 150.0, "juma"));
     }
-
-    // @Test
-    // public void cashCardSerializationTest() throws IOException {
-    // PesaCard cashCard = new PesaCard(99L, 123.45);
-    // assertThat(json.write(cashCard)).isStrictlyEqualToJson("expected.json");
-    // assertThat(json.write(cashCard)).hasJsonPathNumberValue("@.id");
-    // assertThat(json.write(cashCard)).extractingJsonPathNumberValue("@.id").isEqualTo(99);
-    // assertThat(json.write(cashCard)).hasJsonPathNumberValue("@.amount");
-    // assertThat(json.write(cashCard)).extractingJsonPathNumberValue("@.amount").isEqualTo(123.45);
-    // }
 
     @Test
     public void pesaCardSerializationTest() throws IOException {
@@ -56,11 +46,12 @@ public class PesaCardJsonTest {
         String expected = """
                 {
                     "id":1000,
-                    "amount":67.89
+                    "amount":67.89,
+                    "owner":"juma"
                 }
                 """;
         assertThat(json.parse(expected))
-                .isEqualTo(new PesaCard(1000L, 67.89));
+                .isEqualTo(new PesaCard(1000L, 67.89, "juma"));
         assertThat(json.parseObject(expected).id()).isEqualTo(1000);
         assertThat(json.parseObject(expected).amount()).isEqualTo(67.89);
     }
@@ -74,9 +65,9 @@ public class PesaCardJsonTest {
     void cashCardListDeserializationTest() throws IOException {
         String expected = """
                 [
-                   { "id": 99, "amount": 123.45 },
-                   { "id": 100, "amount": 1.0 },
-                   { "id": 101, "amount": 150.00 }
+                   { "id": 99, "amount": 123.45, "owner": "juma" },
+                   { "id": 100, "amount": 1.0, "owner": "juma" },
+                   { "id": 101, "amount": 150.00, "owner": "juma" }
                 ]
                 """;
         assertThat(jsonList.parse(expected)).isEqualTo(pesaCards);
