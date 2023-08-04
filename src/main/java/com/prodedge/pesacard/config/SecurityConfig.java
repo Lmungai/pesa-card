@@ -33,16 +33,24 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService testOnlyUsers(PasswordEncoder passwordEncoder) {
         User.UserBuilder users = User.builder();
+
         UserDetails juma = users
                 .username("juma")
                 .password(passwordEncoder.encode("abc123"))
                 .roles("CARD-OWNER") // new role
                 .build();
+
         UserDetails bakariOwnsNoCards = users
                 .username("bakari-owns-no-cards")
                 .password(passwordEncoder.encode("qrs456"))
                 .roles("NON-OWNER") // new role
                 .build();
-        return new InMemoryUserDetailsManager(juma, bakariOwnsNoCards);
+
+        UserDetails amina = users
+                .username("amina")
+                .password(passwordEncoder.encode("xyz789"))
+                .roles("CARD-OWNER")
+                .build();
+        return new InMemoryUserDetailsManager(juma, bakariOwnsNoCards, amina);
     }
 }

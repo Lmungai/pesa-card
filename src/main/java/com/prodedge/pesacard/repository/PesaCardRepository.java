@@ -10,4 +10,6 @@ public interface PesaCardRepository extends CrudRepository<PesaCard, Long>, Pagi
     PesaCard findByIdAndOwner(Long id, String owner);
 
     Page<PesaCard> findByOwner(String owner, PageRequest amount);
+
+    boolean existsByIdAndOwner(Long id, String owner);
 }

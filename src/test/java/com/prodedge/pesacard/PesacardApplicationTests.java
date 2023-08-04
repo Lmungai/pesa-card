@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.net.URI;
 
 @SpringBootTest(classes = PesacardApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-// @DirtiesContext(classMode = ClassMode.AFTER_EACH_TEST_METHOD)
 class PesacardApplicationTests {
 
 	@Autowired
@@ -183,5 +182,41 @@ class PesacardApplicationTests {
 				.withBasicAuth("juma", "abc123")
 				.exchange("/pesacards/99999", HttpMethod.PUT, request, Void.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	@DirtiesContext
+	void shouldDeleteAnExistingCashCard() {
+		ResponseEntity<Void> response = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.exchange("/pesacards/99", HttpMethod.DELETE, null, Void.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+		ResponseEntity<String> getResponse = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.getForEntity("/pesacards/99", String.class);
+
+		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void shouldNotDeleteACashCardThatDoesNotExist() {
+		ResponseEntity<Void> deleteResponse = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.exchange("/pesacards/99999", HttpMethod.DELETE, null, Void.class);
+		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void shouldNotAllowDeletionOfCashCardsTheyDoNotOwn() {
+		ResponseEntity<Void> deleteResponse = restTemplate
+				.withBasicAuth("juma", "abc123")
+				.exchange("/pesacards/102", HttpMethod.DELETE, null, Void.class);
+		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+		ResponseEntity<String> getResponse = restTemplate
+				.withBasicAuth("amina", "xyz789")
+				.getForEntity("/pesacards/102", String.class);
+		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 	}
 }
